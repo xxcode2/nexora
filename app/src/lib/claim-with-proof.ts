@@ -10,15 +10,13 @@
 import {
     PublicKey,
     Transaction,
-    TransactionInstruction,
     SYSVAR_INSTRUCTIONS_PUBKEY,
 } from '@solana/web3.js';
-import { Program, BN, AnchorProvider } from '@project-serum/anchor';
+import { Program, BN, AnchorProvider } from '@coral-xyz/anchor';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { Ed25519Program } from '@solana/web3.js';
 import { keccak_256 } from '@noble/hashes/sha3';
 import { createArciumService } from '../services/ArciumService';
-import type { Nexora } from '../types/nexora';
 
 // ============================================================================
 // Constants
@@ -49,7 +47,7 @@ interface PayoutProof {
 }
 
 interface ClaimPayoutParams {
-    program: Program<Nexora>;
+    program: Program;
     provider: AnchorProvider;
     market: PublicKey;
     user: PublicKey;
@@ -121,8 +119,8 @@ export async function claimPayoutWithProof({
 
     console.log('📡 Requesting payout computation from Arcium MXE...');
     const { computationId } = await arciumService.requestPayout({
-        market: market.toString(),
-        user: user.toString(),
+        market: market,
+        user: user,
     });
 
     console.log(`⏳ Computation ID: ${computationId}`);
@@ -133,8 +131,8 @@ export async function claimPayoutWithProof({
 
     console.log('⏳ Waiting for MXE to compute payout in TEE...');
     await arciumService.waitForCompletion(computationId, {
-        timeout: 60000, // 60 seconds
-        pollInterval: 2000, // Check every 2 seconds
+        maxWaitMs: 60000, // 60 seconds
+        pollIntervalMs: 2000, // Check every 2 seconds
     });
 
     console.log('✅ MXE computation complete!');
@@ -144,7 +142,15 @@ export async function claimPayoutWithProof({
     // ========================================================================
 
     console.log('📥 Retrieving proof from MXE...');
-    const proof: PayoutProof = await arciumService.readPayoutResult(computationId);
+    const result = await arciumService.readPayoutResult(computationId);
+    
+    const proof: PayoutProof = {
+        payout: result.payoutAmount,
+        nonce: result.nonce,
+        signature: typeof result.signature === 'string' 
+            ? Buffer.from(result.signature, 'hex') 
+            : result.signature,
+    };
 
     console.log('✅ Proof retrieved:');
     console.log(`   Payout: ${proof.payout}`);
@@ -253,7 +259,7 @@ export async function claimPayoutWithProof({
  */
 export function useClaimPayout() {
     const handleClaim = async (
-        program: Program<Nexora>,
+        program: Program,
         provider: AnchorProvider,
         market: PublicKey,
         user: PublicKey

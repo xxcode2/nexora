@@ -1,167 +1,105 @@
-import { FC, useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { FC } from 'react';
 import { BN } from '@coral-xyz/anchor';
-import { Market, UserPosition, useNexora } from '../contexts/NexoraContext';
+import { Market } from '../contexts/NexoraContext';
 
 interface MarketCardProps {
   market: Market;
-  userPosition?: UserPosition;
-  onBetClick: () => void;
-  onUpdate: () => void;
+  onBetClick?: () => void;
 }
 
-const MarketCard: FC<MarketCardProps> = ({ market, userPosition, onBetClick, onUpdate }) => {
-  const { publicKey } = useWallet();
-  const { resolveMarket, claimPayout } = useNexora();
-  const [resolving, setResolving] = useState(false);
-  const [claiming, setClaiming] = useState(false);
+const MarketCard: FC<MarketCardProps> = ({ market, onBetClick }) => {
+  const totalPool = (market.totalPool as BN).toNumber() / 1e6;
 
-  const isAuthority = publicKey?.equals(market.authority);
-  const expiryDate = new Date((market.expiryTimestamp as BN).toNumber() * 1000);
-  const isExpired = Date.now() > expiryDate.getTime();
-  const totalPoolUSDC = (market.totalPool as BN).toNumber() / 1e6;
+  // For V1, we don't have yes/no pool split data
+  // These are placeholder values for UI demonstration
+  const yesPct = 60; // TODO: Calculate from actual bet data
+  const noPct = 40;
 
-  const getResultBadge = () => {
-    if ('yes' in market.result) return '✅ YES';
-    if ('no' in market.result) return '❌ NO';
-    return '⏳ Pending';
+  const now = Date.now() / 1000;
+  const expiryTimestamp = (market.expiryTimestamp as BN).toNumber();
+  const timeLeft = expiryTimestamp - now;
+  const isOpen = timeLeft > 0 && !market.resolved;
+
+  const formatTimeLeft = (seconds: number): string => {
+    if (seconds <= 0) return 'Expired';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   };
 
-  const handleResolve = async (result: 'yes' | 'no') => {
-    setResolving(true);
-    try {
-      const tx = await resolveMarket(market.publicKey, result);
-      console.log('Market resolved:', tx);
-      alert(`Market resolved as ${result.toUpperCase()}! 
-Tx: ${tx.slice(0, 8)}...`);
-      onUpdate();
-    } catch (error: any) {
-      console.error('Error resolving market:', error);
-      alert('Error resolving market: ' + error.message);
-    } finally {
-      setResolving(false);
+  const getStatusBadge = () => {
+    if (market.resolved) {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/25">
+          Resolved
+        </span>
+      );
     }
-  };
-
-  const handleClaim = async () => {
-    setClaiming(true);
-    try {
-      const tx = await claimPayout(market.publicKey);
-      console.log('Claimed payout:', tx);
-      alert(`Payout claimed!
-Tx: ${tx.slice(0, 8)}...`);
-      onUpdate();
-    } catch (error: any) {
-      console.error('Error claiming:', error);
-      alert('Error claiming: ' + error.message);
-    } finally {
-      setClaiming(false);
+    if (isOpen) {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-300 border border-green-500/25">
+          Open
+        </span>
+      );
     }
+    return (
+      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-500/15 text-yellow-300 border border-yellow-500/25">
+        Closed
+      </span>
+    );
   };
 
   return (
-    <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 hover:border-purple-500/40 transition-all transform hover:scale-[1.02]">
+    <div
+      onClick={onBetClick}
+      className="bg-gradient-to-br from-purple-500/10 to-transparent backdrop-blur-sm rounded-2xl p-6 border border-purple-500/12 hover:border-purple-500/30 hover:shadow-lg hover:shadow-purple-500/8 transition-all duration-400 cursor-pointer transform hover:-translate-y-0.5"
+    >
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-purple-200 mb-2 line-clamp-2">
-            {market.question}
-          </h3>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-purple-300/60">Pool:</span>
-            <span className="text-purple-300 font-semibold">${totalPoolUSDC.toFixed(2)}</span>
-          </div>
-        </div>
-        {market.resolved && (
-          <div className="px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 text-sm font-mono">
-            {getResultBadge()}
-          </div>
-        )}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <h3 className="text-sm font-semibold leading-snug text-gray-100">{market.question}</h3>
+        {getStatusBadge()}
       </div>
 
-      {/* Expiry */}
-      <div className="mb-4 text-sm">
-        <span className="text-purple-300/60">Expires:</span>
-        <span className={`ml-2 ${isExpired ? 'text-red-400' : 'text-purple-300'}`}>
-          {expiryDate.toLocaleString()}
-        </span>
-        {isExpired && !market.resolved && (
-          <span className="ml-2 text-red-400 text-xs">(Expired)</span>
-        )}
+      {/* Time Left */}
+      <div className="flex items-center gap-2 mb-4 text-xs font-mono text-slate-400">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
+        </svg>
+        {formatTimeLeft(timeLeft)}
       </div>
 
-      {/* User Position */}
-      {userPosition && (
-        <div className="mb-4 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-          <div className="text-sm">
-            <span className="text-purple-300/60">Your Position:</span>
-            <span className="ml-2 text-purple-300 font-semibold">
-              ${((userPosition.amount as BN).toNumber() / 1e6).toFixed(2)}
-            </span>
-          </div>
-          {userPosition.claimed && (
-            <div className="text-xs text-green-400 mt-1">✓ Claimed</div>
-          )}
+      {/* Pool Distribution Bar */}
+      <div className="mb-4">
+        <div className="flex justify-between text-xs font-medium mb-1.5">
+          <span className="text-green-400">YES {yesPct}%</span>
+          <span className="text-red-400">NO {noPct}%</span>
         </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        {/* Bet Button */}
-        {!market.resolved && !isExpired && publicKey && (
-          <button
-            onClick={onBetClick}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg font-semibold transition-all"
-          >
-            Place Bet
-          </button>
-        )}
-
-        {/* Resolve Buttons (Authority Only) */}
-        {isAuthority && isExpired && !market.resolved && (
-          <>
-            <button
-              onClick={() => handleResolve('yes')}
-              disabled={resolving}
-              className="flex-1 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 rounded-lg font-semibold transition-all disabled:opacity-50"
-            >
-              {resolving ? '...' : '✅ YES'}
-            </button>
-            <button
-              onClick={() => handleResolve('no')}
-              disabled={resolving}
-              className="flex-1 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 rounded-lg font-semibold transition-all disabled:opacity-50"
-            >
-              {resolving ? '...' : '❌ NO'}
-            </button>
-          </>
-        )}
-
-        {/* Claim Button */}
-        {market.resolved && userPosition && !userPosition.claimed && publicKey && (
-          <button
-            onClick={handleClaim}
-            disabled={claiming}
-            className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 rounded-lg font-semibold transition-all disabled:opacity-50"
-          >
-            {claiming ? 'Claiming...' : '💰 Claim Payout'}
-          </button>
-        )}
-
-        {/* Already Claimed */}
-        {market.resolved && userPosition?.claimed && (
-          <div className="flex-1 px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-center text-purple-300/60 text-sm">
-            ✓ Already Claimed
-          </div>
-        )}
+        <div className="w-full h-2 rounded-full overflow-hidden bg-slate-800/50">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-green-400 to-green-500 shadow-sm shadow-green-500/30 transition-all duration-700"
+            style={{ width: `${yesPct}%` }}
+          />
+        </div>
       </div>
 
-      {/* Authority Badge */}
-      {isAuthority && (
-        <div className="mt-3 text-xs text-purple-300/60 text-center">
-          🔑 You own this market
+      {/* Pool Value & Participants */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-xs text-slate-400">Pool Value</div>
+          <div className="text-base font-bold text-gray-100">${totalPool.toFixed(2)}</div>
         </div>
-      )}
+        <div className="flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span className="text-xs text-slate-400">Encrypted bets</span>
+        </div>
+      </div>
     </div>
   );
 };

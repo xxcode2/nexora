@@ -6,7 +6,7 @@ use solana_program::{
     sysvar::instructions::{load_instruction_at_checked, ID as IX_SYSVAR_ID},
 };
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("ZUjdEhJfsNMBV7QbABwSSocMzqrCfhivCgWrhwtaMFm");
 
 // ============================================================================
 // Security Configuration - HARDCODED FOR DEVNET V1

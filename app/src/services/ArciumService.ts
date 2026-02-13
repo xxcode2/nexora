@@ -23,8 +23,9 @@ interface PayoutParams {
   user: PublicKey;
 }
 
-interface PayoutResult {
+export interface PayoutResult {
   payoutAmount: number;
+  nonce: number;
   proof: string;
   signature: string;
   userBetAmount?: number;

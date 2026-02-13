@@ -1,0 +1,27 @@
+# NEXORA DEPLOYMENT GUIDE
+
+## Current Status:
+- ✅ Frontend UI: Complete & running (localhost:5175)
+- ⚠️  Solana Program: Build blocked by blake3 dependency issue
+- ⚠️  Devnet SOL: Need airdrop (rate limited)
+
+## Quick Workaround - Use Mock Mode:
+
+The app already has arcium-mock.ts that simulates MXE! 
+Just need to mock the Solana program calls too.
+
+## Or: Alternative Deployment:
+
+1. Use Solana Playground (browser-based):
+   - Go to https://beta.solpg.io
+   - Import programs/nexora/src/lib.rs
+   - Build & deploy online (they have updated toolchain)
+   - Copy deployed program ID
+   - Update in app/src/contexts/NexoraContext.tsx
+
+2. Use Docker with proper Rust version:
+   - solanalabs/solana:latest image has compatible toolchain
+
+## Technical Issue:
+blake3 v1.8.3 requires edition2024 (Rust nightly unreleased feature)
+Solana CLI ships with cargo 1.84.0 which doesn't support it yet

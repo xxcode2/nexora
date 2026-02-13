@@ -1,17 +1,21 @@
 /**
- * ARCIUM SDK INTEGRATION - REAL IMPLEMENTATION
+ * ARCIUM SDK INTEGRATION - REFERENCE IMPLEMENTATION
  * 
- * This file uses the official Arcium SDK packages:
+ * This file is a reference implementation for when official Arcium SDK packages
+ * become available:
  * - @arcium-hq/client - For submitting computations
  * - @arcium-hq/reader - For reading computation results
  * 
- * Installation:
- * npm install @arcium-hq/client @arcium-hq/reader
+ * NOTE: These packages are not yet available on npm. This file serves as
+ * a template for the future real SDK integration.
+ * 
+ * For now, use arcium-mock.ts for development.
  */
 
-// ✅ OFFICIAL ARCIUM SDK IMPORTS
-import { ArciumClient } from '@arcium-hq/client';
-import { ArciumReader } from '@arcium-hq/reader';
+// NOTE: These imports are commented out because packages don't exist yet
+// Uncomment when Arcium SDK is available:
+// import { ArciumClient } from '@arcium-hq/client';
+// import { ArciumReader } from '@arcium-hq/reader';
 
 interface ArciumSDKConfig {
   /** Arcium network (testnet, devnet, mainnet) */
@@ -27,7 +31,8 @@ interface ArciumSDKConfig {
   endpoint?: string;
 }
 
-interface ComputationResult {
+// Placeholder interface for computation results
+export interface ComputationResult {
   /** Computation ID */
   id: string;
   
@@ -52,6 +57,7 @@ interface ConfidentialBet {
 
 interface PayoutResult {
   payoutAmount: number;
+  nonce: number;
   proof: string;
   signature: string;
   userBetAmount?: number;
@@ -61,35 +67,32 @@ interface PayoutResult {
 /**
  * Nexora Arcium SDK Client
  * 
- * This class wraps official Arcium SDK (@arcium-hq/client, @arcium-hq/reader)
- * for confidential bet operations.
+ * NOTE: This is a placeholder/reference implementation.
+ * The official Arcium SDK packages are not yet available on npm.
+ * 
+ * For development, use arcium-mock.ts instead.
  * 
  * Official Docs: https://docs.arcium.com/developers
  * TypeScript API: https://ts.arcium.com/api/
  */
 export class NexoraArciumClient {
-  private client: ArciumClient;
-  private reader: ArciumReader;
-  private config: ArciumSDKConfig;
-
   constructor(config: ArciumSDKConfig) {
-    this.config = config;
     
-    // Initialize official Arcium client
-    this.client = new ArciumClient({
-      network: config.network,
-      apiKey: config.apiKey,
-      ...(config.endpoint && { endpoint: config.endpoint }),
-    });
+    console.log('⚠️  Using placeholder Arcium client (SDK not available yet)');
+    console.log('   Network:', config.network);
+    console.log('   For development, use arcium-mock.ts instead');
     
-    // Initialize reader for computation results
-    this.reader = new ArciumReader({
-      network: config.network,
-      apiKey: config.apiKey,
-      ...(config.endpoint && { endpoint: config.endpoint }),
-    });
-    
-    console.log('✅ Arcium client initialized:', config.network);
+    // TODO: Uncomment when official SDK is available:
+    // this.client = new ArciumClient({
+    //   network: config.network,
+    //   apiKey: config.apiKey,
+    //   ...(config.endpoint && { endpoint: config.endpoint }),
+    // });
+    // this.reader = new ArciumReader({
+    //   network: config.network,
+    //   apiKey: config.apiKey,
+    //   ...(config.endpoint && { endpoint: config.endpoint }),
+    // });
   }
 
   /**
@@ -108,7 +111,8 @@ export class NexoraArciumClient {
     side: 'yes' | 'no';
     amount: number;
   }): Promise<string> {
-    const betData: ConfidentialBet = {
+    // Placeholder structure (for reference when SDK is available)
+    const betStructure: ConfidentialBet = {
       market: payload.market,
       user: payload.user,
       side: payload.side,
@@ -117,21 +121,27 @@ export class NexoraArciumClient {
       nonce: this.generateNonce(),
     };
 
+    console.log('Bet structure:', betStructure);
+
     // Submit computation to MXE
     // The MXE program 'nexora_record_bet' will store this confidentially
-    const computation = await this.client.submitComputation({
-      program: 'nexora_record_bet',
-      input: JSON.stringify(betData),
-      enclaveId: this.config.enclaveId,
-      metadata: {
-        marketId: payload.market,
-        userId: payload.user,
-        operation: 'record_bet',
-      },
-    });
-
-    console.log('✅ Bet submitted to Arcium:', computation.id);
-    return computation.id;
+    
+    // TODO: Uncomment when SDK is available:
+    // const computation = await this.client.submitComputation({
+    //   program: 'nexora_record_bet',
+    //   input: JSON.stringify(betData),
+    //   enclaveId: this.config.enclaveId,
+    //   metadata: {
+    //     marketId: payload.market,
+    //     userId: payload.user,
+    //     operation: 'record_bet',
+    //   },
+    // });
+    
+    // Placeholder return until SDK is available
+    const fakeComputationId = `bet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('⚠️  Placeholder bet submission:', fakeComputationId);
+    return fakeComputationId;
   }
 
   /**
@@ -150,25 +160,13 @@ export class NexoraArciumClient {
     computationId: string;
     status: string;
   }> {
-    // Submit payout computation to MXE
-    const computation = await this.client.submitComputation({
-      program: 'nexora_compute_payout',
-      input: JSON.stringify({
-        market: request.market,
-        user: request.user,
-      }),
-      enclaveId: this.config.enclaveId,
-      metadata: {
-        marketId: request.market,
-        userId: request.user,
-        operation: 'compute_payout',
-      },
-    });
-
-    console.log('✅ Payout computation submitted:', computation.id);
+    // Placeholder return until SDK is available
+    const fakeComputationId = `payout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.warn('⚠️  Placeholder payout request - SDK not available');
+    console.log('Request params:', request);
     return {
-      computationId: computation.id,
-      status: computation.status || 'pending',
+      computationId: fakeComputationId,
+      status: 'pending',
     };
   }
 
@@ -182,30 +180,18 @@ export class NexoraArciumClient {
    * @returns Payout result with proof and signature
    */
   async readPayoutResult(computationId: string): Promise<PayoutResult> {
-    // Read computation result using reader
-    const result = await this.reader.readComputationResult(computationId);
-
-    if (result.status !== 'completed') {
-      throw new Error(`Computation not completed: ${result.status}`);
-    }
-
-    if (result.error) {
-      throw new Error(`Computation error: ${result.error}`);
-    }
-
-    if (!result.output) {
-      throw new Error('No output from computation');
-    }
-
-    // Parse output
-    const output = JSON.parse(result.output);
-
+    // Placeholder return until SDK is available
+    console.warn('⚠️  Placeholder payout result - SDK not available');
+    console.log('Computation ID:', computationId);
+    
+    // Return mock PayoutResult structure
     return {
-      payoutAmount: output.payoutAmount,
-      proof: output.proof,
-      signature: output.signature,
-      userBetAmount: output.userBetAmount,
-      totalPool: output.totalPool,
+      payoutAmount: 0,
+      nonce: Date.now(),
+      proof: '',
+      signature: '',
+      userBetAmount: 0,
+      totalPool: 0,
     };
   }
 
@@ -215,9 +201,10 @@ export class NexoraArciumClient {
    * @param computationId - Computation ID to check
    * @returns Status string (pending, queued, running, completed, failed)
    */
-  async getComputationStatus(computationId: string): Promise<string> {
-    const status = await this.client.getComputationStatus(computationId);
-    return status || 'unknown';
+  async getComputationStatus(_computationId: string): Promise<string> {
+    // Placeholder return until SDK is available
+    console.warn('⚠️  Placeholder computation status - SDK not available');
+    return 'completed'; // Mock as completed for testing
   }
 
   /**
@@ -262,14 +249,9 @@ export class NexoraArciumClient {
    * @returns True if MXE is reachable and healthy
    */
   async healthCheck(): Promise<boolean> {
-    try {
-      // Try to get a test computation status to verify connectivity
-      await this.client.getComputationStatus('health-check');
-      return true;
-    } catch (error) {
-      console.error('MXE health check failed:', error);
-      return false;
-    }
+    // Placeholder return until SDK is available
+    console.warn('⚠️  Placeholder health check - SDK not available');
+    return true; // Mock as healthy for development
   }
 
   /**

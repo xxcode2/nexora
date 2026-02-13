@@ -4,16 +4,22 @@
  * NEXORA - Arcium SDK Configuration Checker
  * 
  * This script verifies that all required Arcium SDK configuration is present.
+ * 
+ * NOTE: This is a placeholder script. Real Arcium SDK configuration
+ * will be implemented when the SDK packages are available.
  */
 
-import { config } from 'dotenv';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
 
-// Load .env.local
+// Simple env loader (no dotenv dependency needed)
 const envPath = resolve(__dirname, '../.env.local');
-if (existsSync(envPath)) {
-  config({ path: envPath });
+const hasEnvFile = existsSync(envPath);
+
+if (hasEnvFile) {
+  console.log('✅ .env.local file found');
+} else {
+  console.log('⚠️  .env.local file not found (optional for now)');
 }
 
 interface ConfigCheck {

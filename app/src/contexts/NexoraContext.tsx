@@ -180,7 +180,6 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
       .rpc();
 
     // Record bet in mock Arcium
-    const decrypted = await arciumClient.decrypt(encryptedPayload);
     await arciumClient.recordBet(
       market.toString(),
       wallet.publicKey.toString(),
@@ -263,7 +262,7 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
     if (!program) return [];
 
     const accounts = await program.account.market.all();
-    return accounts.map((acc) => ({
+    return accounts.map((acc: any) => ({
       publicKey: acc.publicKey,
       ...acc.account,
     })) as Market[];
@@ -303,7 +302,7 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
       },
     ]);
 
-    return accounts.map((acc) => ({
+    return accounts.map((acc: any) => ({
       publicKey: acc.publicKey,
       ...acc.account,
     })) as UserPosition[];
