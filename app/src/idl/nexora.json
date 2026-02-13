@@ -1,0 +1,167 @@
+{
+  "version": "0.1.0",
+  "name": "nexora",
+  "instructions": [
+    {
+      "name": "createMarket",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "usdcMint", "isMut": false, "isSigner": false },
+        { "name": "authority", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "rent", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "question", "type": "string" },
+        { "name": "expiryTimestamp", "type": "i64" }
+      ]
+    },
+    {
+      "name": "placeBet",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "userPosition", "isMut": true, "isSigner": false },
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "userTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "user", "isMut": true, "isSigner": true },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "encryptedPayload", "type": { "vec": "u8" } },
+        { "name": "amount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "resolveMarket",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true }
+      ],
+      "args": [
+        {
+          "name": "result",
+          "type": {
+            "defined": "MarketResult"
+          }
+        }
+      ]
+    },
+    {
+      "name": "claim",
+      "accounts": [
+        { "name": "market", "isMut": false, "isSigner": false },
+        { "name": "userPosition", "isMut": true, "isSigner": false },
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "userTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "user", "isMut": false, "isSigner": true },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "payoutAmount", "type": "u64" }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "publicKey" },
+          { "name": "question", "type": "string" },
+          { "name": "expiryTimestamp", "type": "i64" },
+          { "name": "totalPool", "type": "u64" },
+          { "name": "resolved", "type": "bool" },
+          { "name": "result", "type": { "defined": "MarketResult" } },
+          { "name": "vault", "type": "publicKey" },
+          { "name": "usdcMint", "type": "publicKey" },
+          { "name": "bump", "type": "u8" },
+          { "name": "vaultBump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "UserPosition",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "user", "type": "publicKey" },
+          { "name": "market", "type": "publicKey" },
+          { "name": "amount", "type": "u64" },
+          { "name": "claimed", "type": "bool" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "MarketResult",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "None" },
+          { "name": "Yes" },
+          { "name": "No" }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "MarketCreatedEvent",
+      "fields": [
+        { "name": "market", "type": "publicKey", "index": false },
+        { "name": "authority", "type": "publicKey", "index": false },
+        { "name": "question", "type": "string", "index": false },
+        { "name": "expiryTimestamp", "type": "i64", "index": false }
+      ]
+    },
+    {
+      "name": "BetPlacedEvent",
+      "fields": [
+        { "name": "market", "type": "publicKey", "index": false },
+        { "name": "user", "type": "publicKey", "index": false },
+        { "name": "amount", "type": "u64", "index": false },
+        { "name": "encryptedPayload", "type": { "vec": "u8" }, "index": false },
+        { "name": "timestamp", "type": "i64", "index": false }
+      ]
+    },
+    {
+      "name": "MarketResolvedEvent",
+      "fields": [
+        { "name": "market", "type": "publicKey", "index": false },
+        { "name": "result", "type": { "defined": "MarketResult" }, "index": false },
+        { "name": "timestamp", "type": "i64", "index": false }
+      ]
+    },
+    {
+      "name": "ClaimEvent",
+      "fields": [
+        { "name": "market", "type": "publicKey", "index": false },
+        { "name": "user", "type": "publicKey", "index": false },
+        { "name": "amount", "type": "u64", "index": false },
+        { "name": "timestamp", "type": "i64", "index": false }
+      ]
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "QuestionTooLong", "msg": "Question must be 280 characters or less" },
+    { "code": 6001, "name": "ExpiryInPast", "msg": "Expiry timestamp must be in the future" },
+    { "code": 6002, "name": "InvalidAmount", "msg": "Invalid bet amount" },
+    { "code": 6003, "name": "PayloadTooLarge", "msg": "Encrypted payload too large (max 512 bytes)" },
+    { "code": 6004, "name": "MarketExpired", "msg": "Market has expired" },
+    { "code": 6005, "name": "MarketResolved", "msg": "Market already resolved" },
+    { "code": 6006, "name": "Overflow", "msg": "Arithmetic overflow" },
+    { "code": 6007, "name": "InvalidResult", "msg": "Invalid market result" },
+    { "code": 6008, "name": "MarketNotExpired", "msg": "Market has not expired yet" },
+    { "code": 6009, "name": "AlreadyResolved", "msg": "Market already resolved" },
+    { "code": 6010, "name": "MarketNotResolved", "msg": "Market not yet resolved" },
+    { "code": 6011, "name": "AlreadyClaimed", "msg": "User has already claimed" },
+    { "code": 6012, "name": "InsufficientVaultBalance", "msg": "Insufficient vault balance" },
+    { "code": 6013, "name": "Unauthorized", "msg": "Unauthorized" }
+  ]
+}
