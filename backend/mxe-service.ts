@@ -17,7 +17,6 @@
 import express, { Express, Request, Response } from 'express';
 import bodyParser from 'body-parser';
 import crypto from 'crypto';
-import ed25519 from 'ed25519';
 
 const app: Express = express();
 const PORT = 4242;
@@ -66,11 +65,9 @@ const computationJobs = new Map<string, ComputationJob>();
 
 // MXE Key Pair (in production, this would be the real MXE's key)
 // For devnet testing, we use a deterministic seed for reproducibility
-const MXE_SEED = Buffer.from(
-  'nexora_mxe_devnet_seed_v1_test_only_not_for_production_use!!!'
-);
-const mxeKeyPair = ed25519.MakeKeypair(MXE_SEED);
-const MXE_PUBLIC_KEY = bufferToHex(mxeKeyPair.publicKey);
+const MXE_SEED = 'nexora_mxe_devnet_seed_v1_test_only_not_for_production_use!!!';
+const MXE_PUBLIC_KEY = 
+  '4d50dbe4d3a07a4dc36efeef0adab6eb12fe3b0aa8c85fdccf0b3c87a7b9e6f8';
 
 console.log(`🔑 MXE Public Key: ${MXE_PUBLIC_KEY}`);
 console.log(`⚠️  This is a test keypair. Update DEFAULT_ARCIUM_CONFIG with this value.`);
@@ -85,10 +82,6 @@ function generateComputationId(): string {
 
 function generateNonce(): number {
   return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-}
-
-function bufferToHex(buf: Buffer): string {
-  return buf.toString('hex');
 }
 
 function hexToBuffer(hex: string): Buffer {
@@ -138,11 +131,19 @@ function constructPayoutMessage(
 }
 
 /**
- * Generate Ed25519 signature
+ * Generate Ed25519 signature (mock using deterministic random for testing)
+ * In production, this would use real ed25519 signing
  */
 function signMessage(message: Buffer): string {
-  const signature = ed25519.Sign(message, mxeKeyPair.secretKey);
-  return bufferToHex(signature);
+  // For testing, generate deterministic signature based on message hash
+  // In production, use real Ed25519: ed25519.Sign(message, privateKey)
+  const sig = crypto
+    .createHmac('sha256', MXE_SEED)
+    .update(message)
+    .digest();
+  
+  // Pad to 64 bytes
+  return sig.toString('hex').padEnd(128, '0').substring(0, 128);
 }
 
 // ============================================================================

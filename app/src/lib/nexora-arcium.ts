@@ -21,7 +21,6 @@
 
 import { PublicKey } from '@solana/web3.js';
 import * as nacl from 'tweetnacl';
-import * as crypto from 'tweetnacl/utils';
 
 /**
  * Arcium API Response types
@@ -307,15 +306,6 @@ export class NexoraArciumClient {
       bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
     }
     return bytes;
-  }
-
-  /**
-   * Utility: Convert bytes to hex string
-   */
-  private bytesToHex(bytes: Uint8Array): string {
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
   }
 }
 
