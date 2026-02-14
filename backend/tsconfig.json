@@ -3,7 +3,6 @@
   "compilerOptions": {
     "outDir": "./build",
     "rootDir": "./",
-    "types": ["node"],
     "lib": ["es2020"]
   },
   "include": ["./**/*.ts"],
