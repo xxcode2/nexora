@@ -1,10 +1,18 @@
 import { createContext, FC, ReactNode, useContext, useMemo } from 'react';
 import { useConnection, useAnchorWallet } from '@solana/wallet-adapter-react';
 import { Program, AnchorProvider, Idl, BN } from '@coral-xyz/anchor';
-import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import {
+  PublicKey,
+  SystemProgram,
+  SYSVAR_RENT_PUBKEY,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+} from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import idlJson from '../idl/nexora.json';
-import { ArciumMockClient } from '../lib/arcium-mock';
+import {
+  NexoraArciumClient,
+  DEFAULT_ARCIUM_CONFIG,
+} from '../lib/nexora-arcium';
 
 // Program ID from Anchor.toml
 const PROGRAM_ID = new PublicKey('Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS');
@@ -45,7 +53,7 @@ export interface UserPosition {
 
 interface NexoraContextType {
   program: Program | null;
-  arciumClient: ArciumMockClient;
+  arciumClient: NexoraArciumClient | null;
   createMarket: (question: string, expiryTimestamp: number) => Promise<string>;
   placeBet: (market: PublicKey, side: 'yes' | 'no', amount: BN) => Promise<string>;
   resolveMarket: (market: PublicKey, result: 'yes' | 'no') => Promise<string>;
@@ -57,7 +65,7 @@ interface NexoraContextType {
 
 const NexoraContext = createContext<NexoraContextType>({
   program: null,
-  arciumClient: new ArciumMockClient(),
+  arciumClient: null,
   createMarket: async () => '',
   placeBet: async () => '',
   resolveMarket: async () => '',
@@ -89,7 +97,14 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
     return new Program(idlJson as Idl, PROGRAM_ID, provider);
   }, [connection, wallet]);
 
-  const arciumClient = useMemo(() => new ArciumMockClient(), []);
+  const arciumClient = useMemo(
+    () =>
+      new NexoraArciumClient(
+        DEFAULT_ARCIUM_CONFIG.apiEndpoint,
+        DEFAULT_ARCIUM_CONFIG.mxePublicKey
+      ),
+    []
+  );
 
   const createMarket = async (
     question: string,
@@ -135,20 +150,11 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
     side: 'yes' | 'no',
     amount: BN
   ): Promise<string> => {
-    if (!program || !wallet) throw new Error('Wallet not connected');
+    if (!program || !wallet || !arciumClient) throw new Error('Wallet not connected');
 
-    // Create encrypted payload
-    const payload = {
-      user: wallet.publicKey.toString(),
-      market: market.toString(),
-      side,
-      amount: amount.toString(),
-      timestamp: Date.now(),
-    };
-
-    const encryptedPayload = await arciumClient.encrypt(JSON.stringify(payload));
-
-    // Get user's token account
+    // ============================================================================
+    // STEP 1: Prepare onchain transaction
+    // ============================================================================
     const userTokenAccount = await getAssociatedTokenAddress(
       USDC_MINT,
       wallet.publicKey
@@ -166,6 +172,11 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
     const marketAccount = await program.account.market.fetch(market);
     const vaultPda = marketAccount.vault as PublicKey;
 
+    // Encrypt bet payload with zero placeholder (real encryption happens in MXE)
+    // Frontend just submits market + user + amount for onchain record
+    const encryptedPayload = new Uint8Array(81);
+
+    // Submit onchain transaction
     const tx = await program.methods
       .placeBet(Array.from(encryptedPayload), amount)
       .accounts({
@@ -179,13 +190,29 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
       })
       .rpc();
 
-    // Record bet in mock Arcium
-    await arciumClient.recordBet(
-      market.toString(),
-      wallet.publicKey.toString(),
+    // ============================================================================
+    // STEP 2: Submit to Arcium MXE for confidential computation
+    // ============================================================================
+    // This happens asynchronously - MXE will store encrypted bet and track totals
+    // Frontend stores computationId for later retrieval of signed payout claim
+    const computationId = await arciumClient.submitBetComputation(
+      market,
+      wallet.publicKey,
       side,
       amount.toNumber()
     );
+
+    // Store computationId in localStorage for recovery
+    const storageKey = `computation:${market.toBase58()}:${wallet.publicKey.toBase58()}`;
+    localStorage.setItem(storageKey, computationId);
+
+    console.log('✅ Bet placed and submitted to MXE', {
+      market: market.toBase58(),
+      side,
+      amount: amount.toNumber(),
+      computationId,
+      txId: tx,
+    });
 
     return tx;
   };
@@ -194,8 +221,12 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
     market: PublicKey,
     result: 'yes' | 'no'
   ): Promise<string> => {
-    if (!program || !wallet) throw new Error('Wallet not connected');
+    if (!program || !wallet || !arciumClient)
+      throw new Error('Wallet not connected');
 
+    // ============================================================================
+    // STEP 1: Update market state onchain
+    // ============================================================================
     const resultEnum = result === 'yes' ? { yes: {} } : { no: {} };
 
     const tx = await program.methods
@@ -206,26 +237,57 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
       })
       .rpc();
 
-    // Compute payouts in mock Arcium
+    // ============================================================================
+    // STEP 2: Trigger payout computation in Arcium MXE
+    // ============================================================================
+    // MXE will compute individual payouts for all bettors based on resolution
     const marketAccount = await program.account.market.fetch(market);
-    await arciumClient.computePayouts(
-      market.toString(),
+    const totalPool = (marketAccount.totalPool as BN).toNumber();
+
+    const payoutComputationId = await arciumClient.triggerPayoutComputation(
+      market,
       result,
-      (marketAccount.totalPool as BN).toNumber()
+      totalPool
     );
+
+    // Store for recovery
+    const storageKey = `payout_computation:${market.toBase58()}`;
+    localStorage.setItem(storageKey, payoutComputationId);
+
+    console.log('✅ Market resolved and payout computation triggered', {
+      market: market.toBase58(),
+      result,
+      totalPool,
+      payoutComputationId,
+      txId: tx,
+    });
 
     return tx;
   };
 
   const claimPayout = async (market: PublicKey): Promise<string> => {
-    if (!program || !wallet) throw new Error('Wallet not connected');
+    if (!program || !wallet || !arciumClient)
+      throw new Error('Wallet not connected');
 
-    // Query payout from Arcium
-    const payoutAmount = await arciumClient.getUserPayout(
-      market.toString(),
-      wallet.publicKey.toString()
-    );
+    // ============================================================================
+    // STEP 1: Retrieve signed payout claim from Arcium MXE
+    // ============================================================================
+    // MXE returns: payout amount, nonce (for replay protection), Ed25519 signature
+    // Signature: Ed25519(Keccak256(market || user || payout || nonce))
+    const { payout, nonce, signature } =
+      await arciumClient.getPayoutClaim(market, wallet.publicKey);
 
+    console.log('📋 Retrieved payout claim from MXE', {
+      market: market.toBase58(),
+      user: wallet.publicKey.toBase58(),
+      payout,
+      nonce,
+      signatureLength: signature.length,
+    });
+
+    // ============================================================================
+    // STEP 2: Prepare onchain proof verification accounts
+    // ============================================================================
     const [userPositionPda] = PublicKey.findProgramAddressSync(
       [
         Buffer.from('position'),
@@ -243,17 +305,36 @@ export const NexoraProvider: FC<NexoraProviderProps> = ({ children }) => {
       wallet.publicKey
     );
 
+    // ============================================================================
+    // STEP 3: Call claim_with_proof instruction
+    // ============================================================================
+    // The onchain program will:
+    // 1. Construct message: Keccak256(market || user || payout || nonce)
+    // 2. Load the Ed25519 signature instruction from sysvar
+    // 3. Verify signature matches MXE_PUBKEY
+    // 4. Verify message matches constructed payout data
+    // 5. Verify nonce hasn't been used (replay protection)
+    // 6. Transfer payout from vault to user if all checks pass
+
     const tx = await program.methods
-      .claim(new BN(payoutAmount))
+      .claimWithProof(new BN(payout), new BN(nonce), Array.from(signature))
       .accounts({
         market,
         userPosition: userPositionPda,
         vault: vaultPda,
         userTokenAccount,
         user: wallet.publicKey,
+        ixSysvar: SYSVAR_INSTRUCTIONS_PUBKEY,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
+
+    console.log('✅ Payout claimed with signature verification', {
+      market: market.toBase58(),
+      user: wallet.publicKey.toBase58(),
+      payout,
+      txId: tx,
+    });
 
     return tx;
   };
